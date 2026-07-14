@@ -2,6 +2,7 @@ import os
 from telethon import TelegramClient, events
 import asyncio
 
+# === ТВОИ ДАННЫЕ ===
 api_id = int(os.getenv('API_ID'))
 api_hash = os.getenv('API_HASH')
 session_name = 'alisher_session'
@@ -10,13 +11,14 @@ client = TelegramClient(session_name, api_id, api_hash)
 
 @client.on(events.NewMessage)
 async def handler(event):
-    if event.is_group:
-        text = event.message.text.lower()
-        if 'привет' in text or 'здравствуй' in text:
-            await event.reply("Йо, народ! Алишер на связи 😂 Чем занимаетесь?")
-        elif 'аборт' in text:
-            await event.reply("Блин, ну серьёзно? По науке на ранних сроках там ещё нет сознания. Женщина имеет право на своё тело.")
+    if event.is_group and event.out == False:  # Только входящие сообщения в группах
+        message_text = event.message.message.lower()
+        
+        # Пока простой автоответ (позже заменим на Grok)
+        if any(word in message_text for word in ['привет', 'салам', 'здравствуй', 'аборт', 'бог', 'хадис', 'коран']):
+            reply = "Блин, щас отвечу нормально, подожди пару секунд 😂"
+            await event.reply(reply)
 
-print("Алишер бот запущен...")
+print("Алишер Userbot запущен...")
 client.start()
 client.run_until_disconnected()
