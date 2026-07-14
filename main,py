@@ -1,1 +1,22 @@
+import os
+from telethon import TelegramClient, events
+import asyncio
 
+api_id = int(os.getenv('API_ID'))
+api_hash = os.getenv('API_HASH')
+session_name = 'alisher_session'
+
+client = TelegramClient(session_name, api_id, api_hash)
+
+@client.on(events.NewMessage)
+async def handler(event):
+    if event.is_group:
+        text = event.message.text.lower()
+        if 'привет' in text or 'здравствуй' in text:
+            await event.reply("Йо, народ! Алишер на связи 😂 Чем занимаетесь?")
+        elif 'аборт' in text:
+            await event.reply("Блин, ну серьёзно? По науке на ранних сроках там ещё нет сознания. Женщина имеет право на своё тело.")
+
+print("Алишер бот запущен...")
+client.start()
+client.run_until_disconnected()
