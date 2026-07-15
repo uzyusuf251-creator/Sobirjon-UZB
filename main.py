@@ -1,37 +1,55 @@
 import os
+import datetime
 import asyncio
+import random
+import google.generativeai as genai
 from telethon import TelegramClient, events
-from telethon.sessions import StringSession
 
-# Получаем переменные окружения
-api_id = int(os.getenv("API_ID", 34463024))
-api_hash = os.getenv("API_HASH", "1e0f0460d7f914c3cdb3726018c57d78")
-session_string = os.getenv("TELETHON_SESSION") or os.getenv("SESSION_STRING")
+# Получаем данные из переменных
+API_ID = int(os.environ.get("API_ID", 34463024))
+API_HASH = os.environ.get("API_HASH", "1e0f0460d7f914c3cdb3726018c57d78")
+GEMINI_API_KEY = os.environ.get("AQ.Ab8RN6LuakSR2vaGMrhW7DbXASLTf1yfhvuEyHVUzCcUCNqjfg", "")
 
-# Безопасная инициализация: если строки сессии нет или она битая, создаем обычный файл сессии
-if session_string and len(session_string.strip()) > 50:
-    print("🔑 Найдена строка сессии, используем StringSession...")
-    client = TelegramClient(StringSession(session_string.strip()), api_id, api_hash)
-else:
-    print("📁 Строка сессии не найдена или неверна. Используем файл сессии alisher_session...")
-    client = TelegramClient('alisher_session', api_id, api_hash)
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
-@client.on(events.NewMessage)
-async def handler(event):
-    if event.is_group and not event.out:   # Только в группах, не свои сообщения
-        text = event.message.message.lower()
-        if any(word in text for word in ["привет", "салам", "аборт", "бог", "хадис", "коран", "аллах"]):
-            await event.reply("блин, хорошая тема 😂 щас нормально отвечу.")
-        else:
-            # Пока редко отвечает, чтобы не спамил
-            if "алишер" in text:
-                await event.reply("я здесь, брат. что обсуждаем?")
+client = TelegramClient('alisher_session', API_ID, API_HASH)
+CURRENT_MODE = "soft"
 
-async def main():
-    print("🚀 Алишер Userbot стартует...")
-    await client.start()
-    print("✅ Алишер успешно запущен и работает!")
-    await client.run_until_disconnected()
+# Функция нового графика: работает с 09:00 до 05:00
+def is_working_time():
+    now = datetime.datetime.now()
+    hour = now.hour
+    # Если время от 09:00 до 23:59 ИЛИ от 00:00 до 04:59
+    if (9 <= hour <= 23) or (0 <= hour < 5):
+        return True
+    return False
 
-if __name__ == "__main__":
-    asyncio.run(main())
+# ... (остальной код функции generate_ai_reply и обработчики команд остаются прежними)
+
+# Исправленная функция автоответчика
+@client.on(events.NewMessage(incoming=True))
+async def alisher_reply(event):
+    global CURRENT_MODE
+    if not event.is_group:
+        return
+        
+    # Проверка нового графика
+    if not is_working_time():
+        return
+
+    sender = await event.get_sender()
+    me = await client.get_me()
+    if sender and sender.id == me.id:
+        return
+
+    should_reply = event.mentioned or (event.is_reply and (await event.get_reply_message()).sender_id == me.id) or (random.random() < 0.15)
+
+    if should_reply:
+        user_text = event.text or ""
+        reply_text = await generate_ai_reply(user_text, CURRENT_MODE)
+        async with client.action(event.chat_id, 'typing'):
+            await asyncio.sleep(random.uniform(2.0, 4.5))
+            await event.reply(reply_text)
+
+# ... (оставшаяся часть кода: async def main и if __name__ == '__main__' как были ранее)
