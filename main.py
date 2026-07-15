@@ -1,12 +1,13 @@
 import os
 import asyncio
 from telethon import TelegramClient, events
+from telethon.sessions import StringSession
 
 api_id = int(os.getenv("API_ID"))
 api_hash = os.getenv("API_HASH")
-session_name = "alisher_session"
+session_string = os.getenv("TELETHON_SESSION")
 
-client = TelegramClient(session_name, api_id, api_hash)
+client = TelegramClient(StringSession(session_string), api_id, api_hash)
 
 @client.on(events.NewMessage)
 async def handler(event):
