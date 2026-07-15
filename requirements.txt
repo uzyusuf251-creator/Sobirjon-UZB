@@ -1,2 +1,2 @@
-telethon
-google-generativeai
+telethon>=1.24.0
+google-generativeai>=0.3.0
