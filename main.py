@@ -40,25 +40,19 @@ async def generate_ai_reply(user_text, mode):
         print(f"Ошибка генерации ответа: {e}")
         return "Что-то я задумался, повтори ещё раз?"
 
-# Диагностическая функция автоответчика
+# Исправленная функция автоответчика
 @client.on(events.NewMessage(incoming=True))
 async def alisher_reply(event):
     global CURRENT_MODE
-
-    print(f"📩 Получено сообщение: is_group={event.is_group}, text={event.text}")
-
     if not event.is_group:
-        print("❌ Не группа, пропускаю")
         return
 
     if not is_working_time():
-        print("❌ Не рабочее время, пропускаю")
         return
 
     sender = await event.get_sender()
     me = await client.get_me()
     if sender and sender.id == me.id:
-        print("❌ Это моё собственное сообщение, пропускаю")
         return
 
     should_reply = (
@@ -67,13 +61,9 @@ async def alisher_reply(event):
         or (random.random() < 0.15)
     )
 
-    print(f"🤔 should_reply = {should_reply}")
-
     if should_reply:
         user_text = event.text or ""
-        print("💬 Генерирую ответ через Gemini...")
         reply_text = await generate_ai_reply(user_text, CURRENT_MODE)
-        print(f"✅ Ответ готов: {reply_text}")
         async with client.action(event.chat_id, 'typing'):
             await asyncio.sleep(random.uniform(2.0, 4.5))
             await event.reply(reply_text)
