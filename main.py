@@ -19,7 +19,6 @@ client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
 CURRENT_MODE = "soft"
 
-# Функция нового графика: работает с 09:00 до 05:00
 def is_working_time():
     now = datetime.datetime.now()
     hour = now.hour
@@ -27,23 +26,23 @@ def is_working_time():
         return True
     return False
 
-# Функция генерации ответа через Gemini
 async def generate_ai_reply(user_text, mode):
     if not GEMINI_API_KEY:
         return "Извини, сейчас не могу ответить осмысленно."
     try:
         model = genai.GenerativeModel("gemini-1.5-flash")
-        prompt = f"Ответь коротко и по-дружески на сообщение (стиль общения: {mode}): {user_text}"
+        prompt = f"Ответь коротко и по-дружески на узбекском языке на сообщение: {user_text}"
         response = await asyncio.to_thread(model.generate_content, prompt)
         return response.text.strip()
     except Exception as e:
         print(f"Ошибка генерации ответа: {e}")
         return "Что-то я задумался, повтори ещё раз?"
 
-# Исправленная функция автоответчика
 @client.on(events.NewMessage(incoming=True))
 async def alisher_reply(event):
     global CURRENT_MODE
+    print(f"📩 Получено сообщение: group={event.is_group}, text={event.text}")
+
     if not event.is_group:
         return
 
@@ -74,5 +73,5 @@ async def main():
     print("✅ Алишер успешно запущен и работает!")
     await client.run_until_disconnected()
 
-if __name__ == "__main__":
+if name == "main":
     asyncio.run(main())
