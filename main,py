@@ -1,3 +1,53 @@
-print("Алишер Userbot запущен!")
-print("API_ID и API_HASH загружены успешно.")
-print("Пока без полного Telethon - тестируем запуск.")
+import os
+from telethon import TelegramClient, events
+import asyncio
+import random
+
+api_id = int(os.getenv('API_ID'))
+api_hash = os.getenv('API_HASH')
+
+client = TelegramClient('alisher', api_id, api_hash)
+
+mode = "normal"  # normal, hard, soft
+
+@client.on(events.NewMessage)
+async def handler(event):
+    if event.is_group and not event.out:
+        text = event.message.text.lower()
+        reply = None
+
+        if text.startswith('/hard'):
+            mode = "hard"
+            reply = "режим жесткий включен"
+        elif text.startswith('/soft'):
+            mode = "soft"
+            reply = "режим мягкий"
+        elif text.startswith('/normal'):
+            mode = "normal"
+            reply = "обычный режим"
+
+        if reply:
+            await event.reply(reply)
+            return
+
+        # Основные ответы (коротко, маленькими буквами)
+        if random.random() < 0.7:  # не на каждое сообщение
+            if "привет" in text:
+                await event.reply("йо народ как дела")
+            elif "аборт" in text:
+                await event.reply("блин по науке там мозга нет еще женщина решает")
+            elif "хадис" in text or "аят" in text:
+                await event.reply("древняя книга 7 века а мы в 21м давай по фактам")
+            elif "бог" in text:
+                await event.reply("бога нет доказательств 0")
+            else:
+                if mode == "hard":
+                    await event.reply("че за фигня опять сказки")
+                elif mode == "soft":
+                    await event.reply("интересно но наука говорит другое")
+                else:
+                    await event.reply("лол типичное")
+
+print("Алишер запущен...")
+client.start()
+client.run_until_disconnected()
