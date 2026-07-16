@@ -1,4 +1,4 @@
-print(f"DEBUG: Файл запущен из {__file__}, время сборки: ВЕРСИЯ-4")
+print(f"DEBUG: Файл запущен из {__file__}, время сборки: ВЕРСИЯ-5")
 import os
 import re
 import datetime
@@ -18,7 +18,7 @@ if GEMINI_API_KEY:
 
 client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
-TROLL_LEVEL = "T2"  # T0, T1, T2, T3
+TROLL_LEVEL = "T2"
 MOODS = ["спокойный", "веселый", "уставший", "с сарказмом"]
 CURRENT_MOOD = random.choice(MOODS)
 
@@ -37,8 +37,8 @@ SYSTEM_PERSONA = """
 Троллинг даражаси: {troll_level}.
 T0 = троллинг йўқ.
 T1 = енгил кесатиқ.
-T2 = ўткирроқ ҳазил, баъзан бироз дағалроқ сўзлар (масалан "аҳмоқ", "жинни", "нима бало" каби) лекин ҳақорат ёки таҳдид йўқ.
-T3 = максимал троллинг, кесатиқ ва истеҳзо кучли, баъзида дағалроқ сўзлашув услуби, лекин ҳеч қачон наврли ҳақорат, нафрат ёки таҳдид йўқ.
+T2 = ўткирроқ ҳазил, баъзан бироз дағалроқ сўзлар лекин ҳақорат ёки таҳдид йўқ.
+T3 = максимал троллинг, лекин ҳеч қачон наврли ҳақорат, нафрат ёки таҳдид йўқ.
 Ҳозирги кайфиятинг: {mood}.
 Агар суҳбат сенга тегишли бўлмаса — жуда қисқа жавоб бер ёки умуман жавоб берма.
 """
@@ -62,7 +62,6 @@ def get_context(chat_id):
     return "\n".join(CHAT_HISTORY.get(chat_id, []))
 
 def clean_response(text):
-    # Убираем эмодзи
     emoji_pattern = re.compile(
         "["
         "\U0001F300-\U0001FAFF"
@@ -72,7 +71,6 @@ def clean_response(text):
     )
     text = emoji_pattern.sub("", text)
 
-    # Убираем фразы, где бот "спаливается" как ИИ
     suspicious = [
         r"мен сунъий интеллект.*?[\.\!\n]",
         r"мен бот.*?[\.\!\n]",
@@ -103,9 +101,6 @@ async def generate_ai_reply(chat_id, user_text):
 async def alisher_reply(event):
     global CURRENT_MOOD
 
-    if not event.is_group:
-        return
-
     if not is_working_time():
         return
 
@@ -118,17 +113,20 @@ async def alisher_reply(event):
     sender_name = getattr(sender, "first_name", "someone") or "someone"
     update_history(event.chat_id, sender_name, user_text)
 
-    print(f"📩 {sender_name}: {user_text}")
+    print(f"📩 {sender_name} (private={event.is_private}, group={event.is_group}): {user_text}")
 
-    if event.mentioned and random.random() < 0.10:
-        print("🤐 Игнорирую упоминание (случайно)")
-        return
-
-    should_reply = (
-        event.mentioned
-        or (event.is_reply and (await event.get_reply_message()).sender_id == me.id)
-        or (random.random() < 0.20)
-    )
+    # В личке отвечаем почти всегда, в группе — по шансу
+    if event.is_private:
+        should_reply = random.random() < 0.90
+    else:
+        if event.mentioned and random.random() < 0.10:
+            print("🤐 Игнорирую упоминание (случайно)")
+            return
+        should_reply = (
+            event.mentioned
+            or (event.is_reply and (await event.get_reply_message()).sender_id == me.id)
+            or (random.random() < 0.50)  # временно повышено для теста
+        )
 
     if not should_reply:
         return
