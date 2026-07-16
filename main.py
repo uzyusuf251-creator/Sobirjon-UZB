@@ -1,4 +1,3 @@
-print(f"DEBUG: Файл запущен из {__file__}, время сборки: ВЕРСИЯ-3")
 import os
 import datetime
 import asyncio
@@ -7,6 +6,7 @@ import google.generativeai as genai
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 
+# Получаем данные из переменных
 API_ID = int(os.environ.get("API_ID", 34463024))
 API_HASH = os.environ.get("API_HASH", "1e0f0460d7f914c3cdb3726018c57d78")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
@@ -17,122 +17,89 @@ if GEMINI_API_KEY:
 
 client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
-# Настройки характера
-TROLL_LEVEL = "T1"  # T0, T1, T2, T3
-MOODS = ["спокойный", "веселый", "уставший", "с сарказмом"]
-CURRENT_MOOD = random.choice(MOODS)
+CURRENT_MODE = "soft"
 
-# Память по чатам (последние сообщения, сбрасывается при перезапуске)
-CHAT_HISTORY = {}
-MAX_HISTORY = 8
-
-SYSTEM_PERSONA = """
-Сен Собиржон, Самарқанддан бўлган оддий йигитсан, 25-35 ёшда.
-Фақат ўзбек тилида, кирилл ёзувида ёзасан. Агар кимдир лотинчада ёзса ҳам, сен кириллчада жавоб бер.
-Жавобларинг қисқа: 1-3 гап, баъзида биттагина гап.
-Расмий услубда ёзма. "албатта", "мен сизга ёрдам бераман", "раҳмат саволингиз учун" каби қолипли ИИ иборалар ишлатма.
-Баъзан кичик хатолар ёки сўзлашув қисқартмалари бўлиши мумкин.
-Одатий сўзлар ишлат: "ҳа", "йўқ", "ну", "қара", "тушунарли", "кейинчи", "бўлди", "нима гап".
-Эмодзи деярли ишлатма, баъзан фақат ":)" ёки "))" каби смайл.
-Ҳеч қачон сен ИИ (сунъий интеллект) эканингни айтма.
-Ҳозирги кайфиятинг: {mood}.
-Троллинг даражаси: {troll_level} (T0=троллинг йўқ, T1=енгил кесатиқ, T2=ўткирроқ ҳазил, T3=максимал троллинг, лекин таҳқир ёки нафрат йўқ).
-Агар суҳбат сенга тегишли бўлмаса — жавоб берма ёки жуда қисқа жавоб бер.
-"""
-
+# Функция графика: работает с 09:00 до 05:00
 def is_working_time():
-    now = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=5)
+    now = datetime.datetime.now()
     hour = now.hour
     if (9 <= hour <= 23) or (0 <= hour < 5):
         return True
     return False
 
-def update_history(chat_id, sender_name, text):
-    if chat_id not in CHAT_HISTORY:
-        CHAT_HISTORY[chat_id] = []
-    CHAT_HISTORY[chat_id].append(f"{sender_name}: {text}")
-    if len(CHAT_HISTORY[chat_id]) > MAX_HISTORY:
-        CHAT_HISTORY[chat_id] = CHAT_HISTORY[chat_id][-MAX_HISTORY:]
-
-def get_context(chat_id):
-    return "\n".join(CHAT_HISTORY.get(chat_id, []))
-
-async def generate_ai_reply(chat_id, user_text):
+# Функция генерации ответа через Gemini
+async def generate_ai_reply(user_text, mode):
     if not GEMINI_API_KEY:
-        return None
+        return "kechirasiz, hozir javob bera olmayapman."
     try:
-        model = genai.GenerativeModel("gemini-3.5-flash")
-        context_text = get_context(chat_id)
-        persona = SYSTEM_PERSONA.format(mood=CURRENT_MOOD, troll_level=TROLL_LEVEL)
-        prompt = f"{persona}\n\nСуҳбат тарихи (context):\n{context_text}\n\nОхирги хабар: {user_text}\n\nЖавоб бер:"
-        response = await asyncio.to_thread(model.generate_content, prompt)
-        return response.text.strip()
+        # Используем рабочую версию модели
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        
+        # Инструкция характера бота
+        prompt = (
+            f"Sen Samarqandlik Sobirsan. Sen sun'iy intellekt emasssan, oddiy odamsan. "
+            f"Hech qachon o'zingni bot yoki AI deb tanishtirma. "
+            f"Javoblaring faqat oddiy o'zbek tilida, juda qisqa (1-2 gap), faqat kichik harflarda bo'lsin. "
+            f"Hech qanday tarjima, izoh yoki qavs qo'shma. Hech qanday smaylik (emoji) ishlatma, umuman nol smaylik. "
+            f"Uslubing ({mode}): xuddi Telegramda jo'ralaring bilan yozishayotgandek erkin, samimiy va biroz qattiqqo'l. "
+            f"Kerak bo'lsa, o'rtacha so'kinishlar yoki qattiq hazillar ishlat, lekin juda oshirib yuborma. "
+            f"Samarqand shevasiga xos so'zlarni qoshsang zo'r bo'ladi. "
+            f"Mana senga yozilgan xabar, shunga javob ber: {user_text}"
+        )
+        
+        # Температура 0.9 для более "человечных" и креативных ответов
+        response = await asyncio.to_thread(
+            model.generate_content, 
+            prompt,
+            generation_config={"temperature": 0.9}
+        )
+        return response.text.strip().lower()
     except Exception as e:
         print(f"Ошибка генерации ответа: {e}")
-        return None
+        return "nima deyapsan, tushunmadim?"
 
+# Функция автоответчика
 @client.on(events.NewMessage(incoming=True))
 async def alisher_reply(event):
-    global CURRENT_MOOD
+    global CURRENT_MODE
+
+    print(f"Получено сообщение: is_group={event.is_group}, text={event.text}")
 
     if not event.is_group:
+        print("Не группа, пропускаю")
         return
 
     if not is_working_time():
+        print("Не рабочее время, пропускаю")
         return
 
     sender = await event.get_sender()
     me = await client.get_me()
     if sender and sender.id == me.id:
-        return
-
-    user_text = event.text or ""
-    sender_name = getattr(sender, "first_name", "someone") or "someone"
-    update_history(event.chat_id, sender_name, user_text)
-
-    print(f"📩 {sender_name}: {user_text}")
-
-    # Иногда вообще молчим, даже если упомянули
-    if event.mentioned and random.random() < 0.10:
-        print("🤐 Игнорирую упоминание (случайно)")
+        print("Это моё собственное сообщение, пропускаю")
         return
 
     should_reply = (
         event.mentioned
         or (event.is_reply and (await event.get_reply_message()).sender_id == me.id)
-        or (random.random() < 0.20)  # ~20-30% участие в чате
+        or (random.random() < 0.15)
     )
 
-    if not should_reply:
-        return
+    print(f"Нужно ли отвечать (should_reply) = {should_reply}")
 
-    # Иногда меняем настроение
-    if random.random() < 0.15:
-        CURRENT_MOOD = random.choice(MOODS)
-
-    # 15% шанс ответить одним словом
-    if random.random() < 0.15:
-        reply_text = random.choice(["ҳа", "бўлди", "кўрамиз", "тушунарли", "йўқ", "ну"])
-    else:
-        reply_text = await generate_ai_reply(event.chat_id, user_text)
-        if not reply_text:
-            return
-
-    print(f"✅ Ответ: {reply_text}")
-
-    async with client.action(event.chat_id, 'typing'):
-        await asyncio.sleep(random.uniform(2.0, 5.0))
-        # 10% шанс ответить встречным вопросом (просто добавим пометку в промпт можно позже)
-        await event.reply(reply_text)
+    if should_reply:
+        user_text = event.text or ""
+        print("Генерирую ответ через Gemini...")
+        reply_text = await generate_ai_reply(user_text, CURRENT_MODE)
+        print(f"Ответ готов: {reply_text}")
+        async with client.action(event.chat_id, 'typing'):
+            await asyncio.sleep(random.uniform(2.0, 4.5))
+            await event.reply(reply_text)
 
 async def main():
-    print("🚀 Запуск клиента...")
+    print("Userbot Sobir стартует...")
     await client.start()
-    print("✅ Client started")
-    print("Авторизован ли пользователь?", await client.is_user_authorized())
-    me = await client.get_me()
-    print("Это аккаунт:", me.username or me.first_name)
-    print("✅ Собиржон полностью готов к работе!")
+    print("Бот успешно запущен и работает!")
     await client.run_until_disconnected()
 
 if __name__ == "__main__":
