@@ -29,7 +29,7 @@ async def generate_ai_reply(user_text, mode):
     if not GEMINI_API_KEY:
         return "Извини, сейчас не могу ответить осмысленно."
     try:
-        model = genai.GenerativeModel("gemini-2.5-flash")
+        model = genai.GenerativeModel("gemini-3.5-flash")
         prompt = f"Ответь коротко и по-дружески на сообщение (стиль общения: {mode}): {user_text}"
         response = await asyncio.to_thread(model.generate_content, prompt)
         return response.text.strip()
