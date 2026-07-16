@@ -39,7 +39,7 @@ async def generate_ai_reply(user_text, mode):
         )
         
         model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
+            model = genai.GenerativeModel("gemini-1.5-flash-latest")
             system_instruction=system_prompt
         )
         
