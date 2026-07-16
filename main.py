@@ -1,10 +1,13 @@
 import os
-import datetime
 import asyncio
 import random
-import google.generativeai as genai
+import warnings
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
+
+# Скрываем предупреждение от Google, чтобы не засорять консоль
+warnings.filterwarnings("ignore")
+import google.generativeai as genai
 
 # Получаем данные из переменных
 API_ID = int(os.environ.get("API_ID", 34463024))
@@ -18,12 +21,6 @@ if GEMINI_API_KEY:
 client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
 CURRENT_MODE = "soft"
-
-# Функция графика: работает с 09:00 до 05:00
-def is_working_time():
-    now = datetime.datetime.now()
-    hour = now.hour
-    return (9 <= hour <= 23) or (0 <= hour < 5)
 
 # Функция генерации ответа через Gemini
 async def generate_ai_reply(user_text, mode):
@@ -54,7 +51,7 @@ async def generate_ai_reply(user_text, mode):
         return response.text.strip().lower()
         
     except Exception as e:
-        print(f"Ошибка генерации ответа: {e}")
+        print(f"Ошибка Gemini: {e}")
         return "nima deyapsan, tushunmadim"
 
 # Функция автоответчика
@@ -62,40 +59,39 @@ async def generate_ai_reply(user_text, mode):
 async def alisher_reply(event):
     global CURRENT_MODE
 
-    # Проверяем, что это группа и рабочее время
-    if not event.is_group or not is_working_time():
-        return
-
     sender = await event.get_sender()
     me = await client.get_me()
     
-    # Не отвечаем на свои же сообщения
+    # Не отвечаем на свои собственные сообщения
     if sender and sender.id == me.id:
         return
 
-    # Логика: когда именно бот должен ответить
-    should_reply = (
-        event.mentioned # Если нас тегнули
-        or (event.is_reply and (await event.get_reply_message()).sender_id == me.id) # Если ответили (Reply) на наше сообщение
-        or (random.random() < 0.15) # Шанс 15% ответить на любое случайное сообщение
-    )
+    should_reply = False
+
+    # ЛОГИКА: Когда отвечать?
+    if event.is_private:
+        # В личных сообщениях отвечаем ВСЕГДА
+        should_reply = True
+    elif event.is_group:
+        # В группе отвечаем, только если нас тегнули или ответили на наше сообщение
+        if event.mentioned or (event.is_reply and (await event.get_reply_message()).sender_id == me.id):
+            should_reply = True
 
     if should_reply:
         user_text = event.text or ""
-        print("Генерирую ответ через Gemini...")
+        print(f"💬 Принял сообщение: {user_text}")
         
         reply_text = await generate_ai_reply(user_text, CURRENT_MODE)
-        print(f"Ответ готов: {reply_text}")
+        print(f"✅ Мой ответ: {reply_text}")
         
-        # Имитация набора текста (тайпинг)
         async with client.action(event.chat_id, 'typing'):
-            await asyncio.sleep(random.uniform(2.0, 4.5))
+            await asyncio.sleep(random.uniform(2.0, 4.0))
             await event.reply(reply_text)
 
 async def main():
-    print("Userbot Sobir стартует...")
+    print("🚀 Userbot Sobir стартует...")
     await client.start()
-    print("Бот успешно запущен и работает!")
+    print("✅ Бот успешно запущен и готов к работе!")
     await client.run_until_disconnected()
 
 if __name__ == "__main__":
