@@ -21,11 +21,13 @@ CURRENT_MODE = "soft"
 
 # Функция графика: работает с 09:00 до 05:00
 def is_working_time():
-    now = datetime.datetime.now()
+    # Берем мировое время и прибавляем 5 часов
+    now = datetime.datetime.utcnow() + datetime.timedelta(hours=5)
     hour = now.hour
     if (9 <= hour <= 23) or (0 <= hour < 5):
         return True
     return False
+
 
 # Функция генерации ответа через Gemini
 async def generate_ai_reply(user_text, mode):
