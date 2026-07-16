@@ -19,7 +19,7 @@ client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 CURRENT_MODE = "soft"
 
 def is_working_time():
-    now = datetime.datetime.now()
+    now = datetime.datetime.utcnow() + datetime.timedelta(hours=5)
     hour = now.hour
     if (9 <= hour <= 23) or (0 <= hour < 5):
         return True
