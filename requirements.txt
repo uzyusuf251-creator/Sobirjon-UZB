@@ -1,2 +1,2 @@
-telethon>=1.24.0
-import google.generativeai as genai
+google-generativeai
+telethon
