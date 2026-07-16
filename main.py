@@ -60,7 +60,9 @@ async def alisher_reply(event):
     print(f"🤔 should_reply = {should_reply}")
     if should_reply:
         user_text = event.text or ""
+        print("💬 Генерирую ответ через Gemini...")
         reply_text = await generate_ai_reply(user_text, CURRENT_MODE)
+        print(f"✅ Ответ готов: {reply_text}")
         async with client.action(event.chat_id, 'typing'):
             await asyncio.sleep(random.uniform(2.0, 4.5))
             await event.reply(reply_text)
