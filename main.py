@@ -16,14 +16,12 @@ if GEMINI_API_KEY:
 
 client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
-CHAT_HISTORY = {}
-
 async def generate_reply(user_text):
     try:
         model = genai.GenerativeModel("gemini-1.5-flash")
-        prompt = f"Ты узбекский парень Собиржон. Отвечай коротко, с лёгким троллингом, маленькими буквами, без эмодзи: {user_text}"
+        prompt = f"Ты узбекский парень. Отвечай коротко, троллингом, маленькими буквами: {user_text}"
         response = await asyncio.to_thread(model.generate_content, prompt)
-        return response.text.strip()[:200]
+        return response.text.strip()[:250]
     except:
         return "ну нима гап"
 
@@ -31,11 +29,9 @@ async def generate_reply(user_text):
 async def handler(event):
     if not event.is_group:
         return
-
     text = event.text or ""
     if not text:
         return
-
     reply = await generate_reply(text)
     await asyncio.sleep(random.uniform(1, 4))
     await event.reply(reply)
