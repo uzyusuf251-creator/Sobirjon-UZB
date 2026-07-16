@@ -21,20 +21,15 @@ CURRENT_MODE = "soft"
 
 # Функция графика: работает с 09:00 до 05:00
 def is_working_time():
-    # Берем мировое время и прибавляем 5 часов
-    now = datetime.datetime.utcnow() + datetime.timedelta(hours=5)
+    now = datetime.datetime.now()
     hour = now.hour
-    if (9 <= hour <= 23) or (0 <= hour < 5):
-        return True
-    return False
-
+    return (9 <= hour <= 23) or (0 <= hour < 5)
 
 # Функция генерации ответа через Gemini
 async def generate_ai_reply(user_text, mode):
     if not GEMINI_API_KEY:
         return "kechirasiz, tarmoqda yo'qman."
     try:
-        # ЖЕСТКИЕ СИСТЕМНЫЕ ИНСТРУКЦИИ (Прошивка мозга)
         system_prompt = (
             "Sen Samarqandlik Sobirsan. "
             "Qat'iy qoidalar: "
@@ -46,20 +41,16 @@ async def generate_ai_reply(user_text, mode):
             f"6. Uslub ({mode}): erkin, samimiy, kocha bolalaridek. O'rtacha so'kinish (blya, dalbayob, qotarma, jalab) va Samarqand shevasini bemalol ishlat. "
         )
         
-        # Передаем инструкции как system_instruction (это работает на 100%)
         model = genai.GenerativeModel(
             model_name="gemini-1.5-flash",
             system_instruction=system_prompt
         )
         
-        # Передаем только текст юзера
         response = await asyncio.to_thread(
             model.generate_content, 
             user_text,
             generation_config={"temperature": 0.8}
         )
-        
-        # Принудительно делаем все буквы маленькими
         return response.text.strip().lower()
         
     except Exception as e:
@@ -71,35 +62,32 @@ async def generate_ai_reply(user_text, mode):
 async def alisher_reply(event):
     global CURRENT_MODE
 
-    print(f"Получено сообщение: is_group={event.is_group}, text={event.text}")
-
-    if not event.is_group:
-        print("Не группа, пропускаю")
-        return
-
-    if not is_working_time():
-        print("Не рабочее время, пропускаю")
+    # Проверяем, что это группа и рабочее время
+    if not event.is_group or not is_working_time():
         return
 
     sender = await event.get_sender()
     me = await client.get_me()
+    
+    # Не отвечаем на свои же сообщения
     if sender and sender.id == me.id:
-        print("Это моё собственное сообщение, пропускаю")
         return
 
+    # Логика: когда именно бот должен ответить
     should_reply = (
-        event.mentioned
-        or (event.is_reply and (await event.get_reply_message()).sender_id == me.id)
-        or (random.random() < 0.15)
+        event.mentioned # Если нас тегнули
+        or (event.is_reply and (await event.get_reply_message()).sender_id == me.id) # Если ответили (Reply) на наше сообщение
+        or (random.random() < 0.15) # Шанс 15% ответить на любое случайное сообщение
     )
-
-    print(f"Нужно ли отвечать (should_reply) = {should_reply}")
 
     if should_reply:
         user_text = event.text or ""
         print("Генерирую ответ через Gemini...")
+        
         reply_text = await generate_ai_reply(user_text, CURRENT_MODE)
         print(f"Ответ готов: {reply_text}")
+        
+        # Имитация набора текста (тайпинг)
         async with client.action(event.chat_id, 'typing'):
             await asyncio.sleep(random.uniform(2.0, 4.5))
             await event.reply(reply_text)
