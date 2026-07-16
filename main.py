@@ -30,33 +30,39 @@ def is_working_time():
 # Функция генерации ответа через Gemini
 async def generate_ai_reply(user_text, mode):
     if not GEMINI_API_KEY:
-        return "kechirasiz, hozir javob bera olmayapman."
+        return "kechirasiz, tarmoqda yo'qman."
     try:
-        # Используем рабочую версию модели
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        
-        # Инструкция характера бота
-        prompt = (
-            f"Sen Samarqandlik Sobirsan. Sen sun'iy intellekt emasssan, oddiy odamsan. "
-            f"Hech qachon o'zingni bot yoki AI deb tanishtirma. "
-            f"Javoblaring faqat oddiy o'zbek tilida, juda qisqa (1-2 gap), faqat kichik harflarda bo'lsin. "
-            f"Hech qanday tarjima, izoh yoki qavs qo'shma. Hech qanday smaylik (emoji) ishlatma, umuman nol smaylik. "
-            f"Uslubing ({mode}): xuddi Telegramda jo'ralaring bilan yozishayotgandek erkin, samimiy va biroz qattiqqo'l. "
-            f"Kerak bo'lsa, o'rtacha so'kinishlar yoki qattiq hazillar ishlat, lekin juda oshirib yuborma. "
-            f"Samarqand shevasiga xos so'zlarni qoshsang zo'r bo'ladi. "
-            f"Mana senga yozilgan xabar, shunga javob ber: {user_text}"
+        # ЖЕСТКИЕ СИСТЕМНЫЕ ИНСТРУКЦИИ (Прошивка мозга)
+        system_prompt = (
+            "Sen Samarqandlik Sobirsan. "
+            "Qat'iy qoidalar: "
+            "1. Hech qachon o'zingni bot yoki sun'iy intellekt (AI) dema. Sen tirik odamsan. "
+            "2. Isming Sobir, Samarqanddansan. Kimdir ismingni so'rasa 'Sobirman' deb javob ber. "
+            "3. U-MU-MAN smaylik (emoji) ishlatma! Nol smaylik. Emoji ishlatsang o'lasan. "
+            "4. Faqat kichik harflar bilan yoz. "
+            "5. Gaplaring qisqa, 1-2 gap. Doston yozma. "
+            f"6. Uslub ({mode}): erkin, samimiy, kocha bolalaridek. O'rtacha so'kinish (blya, dalbayob, qotarma, jalab) va Samarqand shevasini bemalol ishlat. "
         )
         
-        # Температура 0.9 для более "человечных" и креативных ответов
+        # Передаем инструкции как system_instruction (это работает на 100%)
+        model = genai.GenerativeModel(
+            model_name="gemini-1.5-flash",
+            system_instruction=system_prompt
+        )
+        
+        # Передаем только текст юзера
         response = await asyncio.to_thread(
             model.generate_content, 
-            prompt,
-            generation_config={"temperature": 0.9}
+            user_text,
+            generation_config={"temperature": 0.8}
         )
+        
+        # Принудительно делаем все буквы маленькими
         return response.text.strip().lower()
+        
     except Exception as e:
         print(f"Ошибка генерации ответа: {e}")
-        return "nima deyapsan, tushunmadim?"
+        return "nima deyapsan, tushunmadim"
 
 # Функция автоответчика
 @client.on(events.NewMessage(incoming=True))
