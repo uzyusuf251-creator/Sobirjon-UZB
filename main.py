@@ -1,3 +1,4 @@
+print(f"DEBUG: Файл запущен из {__file__}, время сборки: ВЕРСИЯ-2")
 import os
 import datetime
 import asyncio
