@@ -1,13 +1,10 @@
 import os
+import datetime
 import asyncio
 import random
-import warnings
+import google.generativeai as genai
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
-
-# Скрываем предупреждение от Google, чтобы не засорять консоль
-warnings.filterwarnings("ignore")
-import google.generativeai as genai
 
 # Получаем данные из переменных
 API_ID = int(os.environ.get("API_ID", 34463024))
@@ -20,35 +17,39 @@ if GEMINI_API_KEY:
 
 client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
-CURRENT_MODE = "soft"
+# Функция графика: работает с 09:00 до 05:00
+def is_working_time():
+    now = datetime.datetime.now()
+    hour = now.hour
+    return (9 <= hour <= 23) or (0 <= hour < 5)
 
 # Функция генерации ответа через Gemini
-async def generate_ai_reply(user_text, mode):
+async def generate_ai_reply(user_text):
     if not GEMINI_API_KEY:
         return "kechirasiz, tarmoqda yo'qman."
     try:
-        system_prompt = (
-            "Sen Samarqandlik Sobirsan. "
-            "Qat'iy qoidalar: "
-            "1. Hech qachon o'zingni bot yoki sun'iy intellekt (AI) dema. Sen tirik odamsan. "
-            "2. Isming Sobir, Samarqanddansan. Kimdir ismingni so'rasa 'Sobirman' deb javob ber. "
-            "3. U-MU-MAN smaylik (emoji) ishlatma! Nol smaylik. Emoji ishlatsang o'lasan. "
-            "4. Faqat kichik harflar bilan yoz. "
-            "5. Gaplaring qisqa, 1-2 gap. Doston yozma. "
-            f"6. Uslub ({mode}): erkin, samimiy, kocha bolalaridek. O'rtacha so'kinish (blya, dalbayob, qotarma, jalab) va Samarqand shevasini bemalol ishlat. "
-        )
+        # Используем САМУЮ базовую и надежную модель
+        model = genai.GenerativeModel("gemini-pro")
         
-        model = genai.GenerativeModel(
-            model = genai.GenerativeModel("gemini-1.5-flash-latest")
-            system_instruction=system_prompt
+        # Вшиваем правила прямо в запрос, чтобы работало на ЛЮБОЙ модели
+        prompt = (
+            f"Sen Samarqandlik Sobirsan. "
+            f"1. Hech qachon o'zingni bot yoki sun'iy intellekt (AI) dema. Sen odamsan. "
+            f"2. Isming Sobir, Samarqanddansan. "
+            f"3. U-MU-MAN smaylik (emoji) ishlatma! Nol smaylik. "
+            f"4. Faqat kichik harflar bilan yoz. "
+            f"5. Gaplaring juda qisqa (1-2 gap). "
+            f"6. Uslub: erkin, samimiy, kocha bolalaridek. O'rtacha so'kinish (blya, dalbayob) va Samarqand shevasini ishlat. "
+            f"\n\nMana senga xabar, shunga javob ber: {user_text}"
         )
         
         response = await asyncio.to_thread(
             model.generate_content, 
-            user_text,
+            prompt,
             generation_config={"temperature": 0.8}
         )
-        return response.text.strip().lower()
+        # Убираем возможные звездочки и делаем маленькие буквы
+        return response.text.strip().replace("*", "").lower()
         
     except Exception as e:
         print(f"Ошибка Gemini: {e}")
@@ -57,41 +58,36 @@ async def generate_ai_reply(user_text, mode):
 # Функция автоответчика
 @client.on(events.NewMessage(incoming=True))
 async def alisher_reply(event):
-    global CURRENT_MODE
+    if not event.is_group or not is_working_time():
+        return
 
     sender = await event.get_sender()
     me = await client.get_me()
     
-    # Не отвечаем на свои собственные сообщения
     if sender and sender.id == me.id:
         return
 
-    should_reply = False
-
-    # ЛОГИКА: Когда отвечать?
-    if event.is_private:
-        # В личных сообщениях отвечаем ВСЕГДА
-        should_reply = True
-    elif event.is_group:
-        # В группе отвечаем, только если нас тегнули или ответили на наше сообщение
-        if event.mentioned or (event.is_reply and (await event.get_reply_message()).sender_id == me.id):
-            should_reply = True
+    should_reply = (
+        event.mentioned 
+        or (event.is_reply and (await event.get_reply_message()).sender_id == me.id) 
+        or (random.random() < 0.15) 
+    )
 
     if should_reply:
         user_text = event.text or ""
-        print(f"💬 Принял сообщение: {user_text}")
+        print(f"Принял сообщение: {user_text}")
         
-        reply_text = await generate_ai_reply(user_text, CURRENT_MODE)
-        print(f"✅ Мой ответ: {reply_text}")
+        reply_text = await generate_ai_reply(user_text)
+        print(f"Мой ответ: {reply_text}")
         
         async with client.action(event.chat_id, 'typing'):
-            await asyncio.sleep(random.uniform(2.0, 4.0))
+            await asyncio.sleep(random.uniform(2.0, 4.5))
             await event.reply(reply_text)
 
 async def main():
-    print("🚀 Userbot Sobir стартует...")
+    print("Userbot Sobir стартует...")
     await client.start()
-    print("✅ Бот успешно запущен и готов к работе!")
+    print("Бот успешно запущен и готов к работе!")
     await client.run_until_disconnected()
 
 if __name__ == "__main__":
