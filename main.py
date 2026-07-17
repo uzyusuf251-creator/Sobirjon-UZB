@@ -103,7 +103,7 @@ async def generate_ai_reply(chat_id, user_text, situation, address_form):
     if not GEMINI_API_KEY:
         return None
     try:
-        model = genai.GenerativeModel("gemini-3.5-flash")
+        model = genai.GenerativeModel("gemini-2.5-flash")
         context_text = get_context(chat_id)
 
         address_instruction = (
