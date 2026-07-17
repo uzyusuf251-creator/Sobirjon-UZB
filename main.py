@@ -62,7 +62,7 @@ def detect_situation(user_text):
 async def generate_ai_reply(chat_id, user_text, situation, address_form):
     if not GEMINI_API_KEY: return None
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-1.5-pro")
         context_text = get_context(chat_id)
         
         persona = f"""
