@@ -1,4 +1,4 @@
-print(f"DEBUG: Файл запущен из {__file__}, время сборки: ВЕРСИЯ-10")
+print(f"DEBUG: Файл запущен из {__file__}, время сборки: ВЕРСИЯ-11")
 import os
 import re
 import time
@@ -405,12 +405,17 @@ async def main_handler(event):
     if not BOT_ACTIVE:
         return
 
-    # Антиспам: APK файлы (проверяем всегда, в группах)
+    # Антиспам: APK файлы + ключевые слова + AI-проверка
     if event.is_group:
         if await check_apk_file(event):
             return
         if await check_spam_text(event):
             return
+        # Умная проверка через Gemini (бесплатно)
+        if event.text and len(event.text.strip()) > 8:
+            if await is_spam_message(event.text):
+                await try_delete_spam(event, "AI-спам")
+                return
 
     if not is_working_time():
         return
