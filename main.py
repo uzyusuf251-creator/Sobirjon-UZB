@@ -1,4 +1,4 @@
-print(f"DEBUG: Файл запущен из {__file__}, время сборки: ВЕРСИЯ-11")
+print(f"DEBUG: Файл запущен из {__file__}, время сборки: ВЕРСИЯ-12")
 import os
 import re
 import time
@@ -33,12 +33,11 @@ PROACTIVE_COOLDOWN_SECONDS = 60 * 60
 MIN_MESSAGES_FOR_PROACTIVE = 6
 
 ERROR_COUNTER = {}
-USER_FORM = {}  # (chat_id, sender_id) -> "sizlash" (Вы) или "senlash" (ты)
+USER_FORM = {}
 
 FATE_TRIGGERS = ["бог знает", "воля бога", "воля божья", "иншаллах", "худо билади", "аллоҳ билади", "тақдир"]
 TROLL_TRIGGERS = ["дурак", "тупой", "заткнись", "пошел ты", "пошёл ты", "иди нахуй", "бот ли ты", "ты бот"]
 
-# --- Антиспам ---
 BOT_ACTIVE = True
 SPAM_KEYWORDS = [
     "profilni unuting", "yoki yo'q", "lichkaga yoz", "profilimga",
@@ -50,7 +49,7 @@ SPAM_KEYWORDS = [
 DELETIONS_TODAY = 0
 DELETIONS_DATE = None
 MAX_DELETIONS_PER_DAY = 15
-LAST_MESSAGE_PER_SENDER = {}  # (chat_id, sender_id) -> текст последнего сообщения (для детекта повторов)
+LAST_MESSAGE_PER_SENDER = {}
 
 SYSTEM_PERSONA_TEMPLATE = """
 Сенинг исминг Собир. Сен 33 ёшли йигитсан, Самарқанддан. Кореяда ўқигансан, корейс тилини яхши биласан.
@@ -155,7 +154,7 @@ async def generate_ai_reply(chat_id, user_text, situation, address_form):
     if not GEMINI_API_KEY:
         return None
     try:
-        model = genai.GenerativeModel("gemini-2.5-flash")
+        model = genai.GenerativeModel("gemini-3.5-flash-lite")
         context_text = get_context(chat_id)
 
         address_instruction = (
@@ -207,7 +206,7 @@ async def generate_proactive_message(chat_id):
     if not GEMINI_API_KEY:
         return None
     try:
-        model = genai.GenerativeModel("gemini-2.5-flash")
+        model = genai.GenerativeModel("gemini-3.5-flash-lite")
         context_text = get_context(chat_id)
         if not context_text or len(context_text.strip()) < 20:
             return None
@@ -239,7 +238,7 @@ async def is_spam_message(text):
     if not GEMINI_API_KEY or not text or len(text.strip()) < 3:
         return False
     try:
-        model = genai.GenerativeModel("gemini-2.5-flash")
+        model = genai.GenerativeModel("gemini-3.5-flash-lite")
         prompt = (
             "Қуйидаги хабар telegram гуруҳидаги спам, шубҳали профиль реклама қилиш, "
             "интим/жинсий таклиф, крипто/молиявий алдов ёки провокацион хабарми? "
@@ -307,12 +306,10 @@ async def check_spam_text(event):
 
     text_lower = text.lower()
 
-    # Быстрая проверка по ключевым словам
     if any(word in text_lower for word in SPAM_KEYWORDS):
         await try_delete_spam(event, "ключевое слово")
         return True
 
-    # Проверка на повтор одного и того же сообщения от одного отправителя
     key = (event.chat_id, event.sender_id)
     last_text = LAST_MESSAGE_PER_SENDER.get(key)
     LAST_MESSAGE_PER_SENDER[key] = text_lower
@@ -396,7 +393,6 @@ async def main_handler(event):
     if sender and sender.id == me.id:
         return
 
-    # Команды владельца (только в личке, только от OWNER_ID)
     if event.is_private and sender and sender.id == OWNER_ID:
         handled = await owner_commands(event)
         if handled:
@@ -405,13 +401,11 @@ async def main_handler(event):
     if not BOT_ACTIVE:
         return
 
-    # Антиспам: APK файлы + ключевые слова + AI-проверка
     if event.is_group:
         if await check_apk_file(event):
             return
         if await check_spam_text(event):
             return
-        # Умная проверка через Gemini (бесплатно)
         if event.text and len(event.text.strip()) > 8:
             if await is_spam_message(event.text):
                 await try_delete_spam(event, "AI-спам")
