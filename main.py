@@ -110,7 +110,7 @@ async def is_spam_message(text):
     if not GEMINI_API_KEY or not text or len(text.strip()) < 5:
         return False
     try:
-        model = genai.GenerativeModel("gemini-2.5-flash")
+        model = genai.GenerativeModel("gemini-3.5-flash-lite")
         prompt = (
             "Қуйидаги хабар telegram гуруҳидаги спамми? "
             "(реклама профили, интим/секс таклиф, крипто/молиявий алдов, "
