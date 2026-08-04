@@ -1,4 +1,4 @@
-print(f"DEBUG: Файл запущен из {__file__}, время сборки: ВЕРСИЯ-14")
+print(f"DEBUG: Файл запущен из {__file__}, время сборки: ВЕРСИЯ-15")
 import os
 import re
 import time
@@ -8,6 +8,7 @@ import unicodedata
 import google.generativeai as genai
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
+from telethon.tl.functions.users import GetFullUserRequest
 
 API_ID = int(os.environ.get("API_ID", 34463024))
 API_HASH = os.environ.get("API_HASH", "1e0f0460d7f914c3cdb3726018c57d78")
@@ -21,6 +22,8 @@ client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
 OWNER_ID = 106620450
 
+ALLOWED_CHAT_ID = None  # заполним ниже, после того как узнаем ID группы
+
 BOT_ACTIVE = True
 
 SPAM_KEYWORDS = [
@@ -29,19 +32,21 @@ SPAM_KEYWORDS = [
     "yolg'iz", "одинок", "одиноко", "жду тебя", "приват", "vip video",
     "bitcoin", "биткоин", "crypto", "криптовалюта",
     "investitsiya", "заработок", "usdt", "usdc",
+    "bosing", "pushaymon", "to'liq video", "muhabbat",
+    "jasurler uchun", "profilimga kiring",
 ]
 
 VAGUE_SOLICIT_PHRASES = [
     "хотите увидеть", "хочешь увидеть", "istaysizmi", "ko'rgingiz keladimi",
     "meni ko'rasizmi", "хочешь меня", "покажу себя", "мени курасизми",
     "yozing menga", "напиши мне лично", "faqat siz uchun", "только для тебя",
-    "bormisiz", "bor mi siz",
+    "bormisiz", "bor mi siz", "hoziroq o'ting", "o'ting",
 ]
 
 SUSPICIOUS_NAME_EMOJI = re.compile(
     "[\U0001F493\U0001F495\U0001F496\U0001F497\U0001F498\U0001F49A\U0001F49B"
     "\U0001F49C\U0001F49D\U0001F49E\U0001F49F\U00002764\U0001F48B\U0001F60D"
-    "\U0001F618\U0001F970\U0001F339\U0001F337]"
+    "\U0001F618\U0001F970\U0001F339\U0001F337\U0001F34C\U0001F525]"
 )
 
 SUSPICIOUS_BIO_EMOJI = re.compile(
@@ -80,7 +85,7 @@ def has_vague_solicitation(text):
 
 
 async def check_profile_signals(sender):
-    """Проверяет имя, bio, фото и username - возвращает счёт подозрительности."""
+    """Проверяет имя, bio, фото, username и дату рождения - возвращает счёт подозрительности."""
     score = 0
 
     name = f"{getattr(sender, 'first_name', '') or ''} {getattr(sender, 'last_name', '') or ''}"
@@ -94,14 +99,22 @@ async def check_profile_signals(sender):
         score += 1
 
     try:
-        full_user = await client.get_entity(sender.id)
+        full = await client(GetFullUserRequest(sender.id))
+        full_user = full.full_user
         bio = getattr(full_user, 'about', '') or ''
         if SUSPICIOUS_BIO_EMOJI.search(bio):
             score += 2
         if re.search(r'(https?://|t\.me/)', bio.lower()):
             score += 1
+
+        birthday = getattr(full_user, 'birthday', None)
+        if birthday:
+            day = getattr(birthday, 'day', None)
+            month = getattr(birthday, 'month', None)
+            if day == 1 and month == 1:
+                score += 1
     except Exception as e:
-        print(f"Не удалось проверить bio: {e}")
+        print(f"Не удалось проверить bio/birthday: {e}")
 
     return score
 
@@ -110,7 +123,7 @@ async def is_spam_message(text):
     if not GEMINI_API_KEY or not text or len(text.strip()) < 5:
         return False
     try:
-        model = genai.GenerativeModel("gemini-3.5-flash-lite")
+        model = genai.GenerativeModel("gemini-2.5-flash")
         prompt = (
             "Қуйидаги хабар telegram гуруҳидаги спамми? "
             "(реклама профили, интим/секс таклиф, крипто/молиявий алдов, "
@@ -176,7 +189,6 @@ async def check_spam_text(event):
     if not raw_text:
         return False
 
-    # Скрытые символы - проверяем ДО очистки, чтобы посчитать их количество
     hidden_count = count_hidden_chars(raw_text)
     if hidden_count >= 3:
         await try_delete_spam(event, f"скрытые символы ({hidden_count} шт)")
@@ -185,7 +197,6 @@ async def check_spam_text(event):
     text = clean_hidden_chars(raw_text)
     text_lower = text.lower().strip()
 
-    # Повтор сообщения - приоритетная проверка
     key = (event.chat_id, event.sender_id)
     last_text = LAST_MESSAGE_PER_SENDER.get(key)
     LAST_MESSAGE_PER_SENDER[key] = text_lower
@@ -194,7 +205,6 @@ async def check_spam_text(event):
         await try_delete_spam(event, "повтор сообщения")
         return True
 
-    # Ключевые слова
     if any(word in text_lower for word in SPAM_KEYWORDS):
         await try_delete_spam(event, "ключевое слово")
         return True
@@ -274,6 +284,11 @@ async def main_handler(event):
     if sender and sender.id == me.id:
         return
 
+    # Команда для узнавания ID группы (пиши "chatid" прямо в группе)
+    if event.is_group and (event.text or "").strip().lower() == "chatid" and sender and sender.id == OWNER_ID:
+        await event.reply(f"ID этой группы: {event.chat_id}")
+        return
+
     if event.is_private and sender and sender.id == OWNER_ID:
         await owner_commands(event)
         return
@@ -284,11 +299,12 @@ async def main_handler(event):
     if not event.is_group:
         return
 
-    # 1. APK файлы
+    if ALLOWED_CHAT_ID is not None and event.chat_id != ALLOWED_CHAT_ID:
+        return
+
     if await check_apk_file(event):
         return
 
-    # 2. Профиль (имя/bio/фото/username) + расплывчатый текст
     if event.text:
         profile_score = await check_profile_signals(sender)
         if profile_score >= 3:
@@ -298,11 +314,9 @@ async def main_handler(event):
             await try_delete_spam(event, f"профиль+расплывчатый текст (score={profile_score})")
             return
 
-    # 3. Скрытые символы / повтор / ключевые слова
     if await check_spam_text(event):
         return
 
-    # 4. AI-проверка как последний рубеж
     if event.text and len(event.text.strip()) > 8:
         if await is_spam_message(event.text):
             await try_delete_spam(event, "AI-спам")
