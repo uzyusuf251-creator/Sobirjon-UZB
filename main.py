@@ -36,6 +36,10 @@ SPAM_KEYWORDS = [
     "jasurler uchun", "profilimga kiring",
 ]
 
+WHITELIST_WORDS = [
+    "vishenka", "вишенка", "veshenka",
+]
+
 VAGUE_SOLICIT_PHRASES = [
     "хотите увидеть", "хочешь увидеть", "istaysizmi", "ko'rgingiz keladimi",
     "meni ko'rasizmi", "хочешь меня", "покажу себя", "мени курасизми",
@@ -82,6 +86,11 @@ def count_hidden_chars(text):
 def has_vague_solicitation(text):
     text_lower = text.lower()
     return any(phrase in text_lower for phrase in VAGUE_SOLICIT_PHRASES)
+
+
+def is_whitelisted(text):
+    text_lower = text.lower()
+    return any(word in text_lower for word in WHITELIST_WORDS)
 
 
 async def check_profile_signals(sender):
@@ -225,7 +234,10 @@ async def owner_commands(event):
             "status - статус и сколько удалил сегодня\n"
             "keywords - список спам-слов\n"
             "add [слово] - добавить спам-слово\n"
-            "remove [номер] - удалить слово из списка"
+            "remove [слово или номер] - удалить слово из чёрного списка\n"
+            "white - список белых слов (никогда не удаляются)\n"
+            "addwhite [слово] - добавить в белый список\n"
+            "removewhite [слово] - убрать из белого списка"
         )
         await event.reply(help_text)
         return True
@@ -262,15 +274,48 @@ async def owner_commands(event):
         return True
 
     if text_lower.startswith("remove "):
+        query = text[7:].strip().lower()
+        # Сначала пробуем как номер
         try:
-            index = int(text[7:].strip()) - 1
+            index = int(query) - 1
             if 0 <= index < len(SPAM_KEYWORDS):
                 removed = SPAM_KEYWORDS.pop(index)
                 await event.reply(f"Удалено: {removed}")
             else:
                 await event.reply("Такого номера нет")
+            return True
         except ValueError:
-            await event.reply("Напиши номер правильно")
+            pass
+        # Если не номер - ищем и удаляем по самому слову
+        if query in SPAM_KEYWORDS:
+            SPAM_KEYWORDS.remove(query)
+            await event.reply(f"Удалено: {query}")
+        else:
+            await event.reply("Такого слова нет в списке")
+        return True
+
+    if text_lower == "white":
+        if WHITELIST_WORDS:
+            numbered_list = "\n".join([f"{i+1}. {word}" for i, word in enumerate(WHITELIST_WORDS)])
+            await event.reply(f"Белый список (никогда не удаляются):\n{numbered_list}")
+        else:
+            await event.reply("Белый список пуст")
+        return True
+
+    if text_lower.startswith("addwhite "):
+        new_word = text[9:].strip().lower()
+        if new_word:
+            WHITELIST_WORDS.append(new_word)
+            await event.reply(f"Добавлено в белый список: {new_word}")
+        return True
+
+    if text_lower.startswith("removewhite "):
+        query = text[12:].strip().lower()
+        if query in WHITELIST_WORDS:
+            WHITELIST_WORDS.remove(query)
+            await event.reply(f"Убрано из белого списка: {query}")
+        else:
+            await event.reply("Такого слова нет в белом списке")
         return True
 
     return False
@@ -304,6 +349,9 @@ async def main_handler(event):
 
     if await check_apk_file(event):
         return
+
+    if event.text and is_whitelisted(event.text):
+        return  # белый список - никогда не трогаем
 
     if event.text:
         profile_score = await check_profile_signals(sender)
